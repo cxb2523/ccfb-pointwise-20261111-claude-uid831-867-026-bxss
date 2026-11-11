@@ -52,17 +52,27 @@ func main() {
 		headers = []string{args.Header}
 	}
 
-	var payloads []string
+	var rawCallbacks []string
 	if args.PayloadFile != "" {
 		var err error
-		payloads, err = payloadParser.ReadLinesFromFile()
+		rawCallbacks, err = payloadParser.ReadLinesFromFile()
 		if err != nil {
 			fmt.Printf(colours.ErrorColor, "Error reading payload file: "+err.Error())
 			return
 		}
 	} else if args.Payload != "" {
-		payloads = []string{args.Payload}
+		rawCallbacks = []string{args.Payload}
 	}
+
+	// Encode every raw callback once for the selected injection context.
+	// The default html context is the identity transform, so legacy
+	// payloads reach the scanner byte-for-byte unchanged.
+	payloadList, err := payloads.BuildAll(rawCallbacks, args.Context)
+	if err != nil {
+		fmt.Printf(colours.ErrorColor, "Error building payloads for context "+string(args.Context)+": "+err.Error())
+		os.Exit(2)
+	}
+	fmt.Printf(colours.NoticeColor, "Injection Context: "+string(args.Context))
 
 	fmt.Printf(colours.NoticeColor, "Please Be Patient for bxss"+"")
 
@@ -76,7 +86,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for link := range workChan {
-				payloadParser.ProcessPayloadsAndHeaders(limiter, link, payloads, headers)
+				payloadParser.ProcessPayloadsAndHeaders(limiter, link, payloadList, headers)
 			}
 		}()
 	}
